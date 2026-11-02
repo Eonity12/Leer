@@ -384,7 +384,15 @@ function viewSettings(){
   $('#s-mode').value=cfg.mode; $('#s-saver').checked=!!cfg.saver;
   $('#s-mode').onchange=e=>{cfg.mode=e.target.value;sv('cfg',cfg)};
   $('#s-saver').onchange=e=>{cfg.saver=e.target.checked;sv('cfg',cfg)};
-  $('#s-pxs').onclick=()=>{cfg.proxy=$('#s-px').value.trim().replace(/\/+$/,'');sv('cfg',cfg);browseKey='';toast(cfg.proxy?'Relay saved':'Relay cleared')};
+  $('#s-pxs').onclick=()=>{
+    let v=$('#s-px').value.replace(/\s+/g,'');
+    if(v){
+      if(!/^https?:\/\//i.test(v))v='https://'+v;
+      try{const u=new URL(v);if(!u.hostname.includes('.'))throw new Error('x');v=u.origin}
+      catch(e){return toast('That doesn’t look like a web address. Paste the full https://… address')}
+    }
+    cfg.proxy=v;sv('cfg',cfg);browseKey='';$('#s-px').value=v;toast(v?'Relay saved':'Relay cleared');
+  };
   $('#s-pxt').onclick=async()=>{
     if(!cfg.proxy)return toast('Save a relay URL first');
     try{const r=await fetch(px('https://api.mangadex.org/ping')),t=await r.text();toast(r.ok&&/pong/i.test(t)?'Relay works ✓':'Relay replied HTTP '+r.status)}
