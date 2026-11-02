@@ -1,0 +1,31 @@
+{
+  "name": "My Example List",
+  "series": [
+    {
+      "id": "example-1",
+      "title": "Example Series",
+      "cover": "covers/example-1.jpg",
+      "description": "Covers and pages may be full URLs or paths relative to this file.",
+      "chapters": [
+        {
+          "id": "c1",
+          "number": "1",
+          "title": "First chapter",
+          "pages": ["pages/ex1/001.jpg", "pages/ex1/002.jpg", "pages/ex1/003.jpg"]
+        },
+        {
+          "id": "c2",
+          "number": "2",
+          "title": "Pages loaded from a separate file",
+          "pagesUrl": "pages/ex1/ch2.json"
+        }
+      ]
+    },
+    {
+      "id": "example-2",
+      "title": "Large Series",
+      "cover": "https://example.com/cover.jpg",
+      "chaptersUrl": "series/example-2/chapters.json"
+    }
+  ]
+}
