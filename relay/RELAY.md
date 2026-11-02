@@ -8,6 +8,18 @@ Do this on a computer if you can; Cloudflare's dashboard is cramped on a phone.
 4. Copy the Worker's address. It looks like `https://leer-relay.yourname.workers.dev`.
 5. In Leer, open **Settings → MangaDex relay**, paste the address, press **Save**, then **Test connection**. It should say "Relay works".
 
+## Option B: deploy straight from GitHub (no code editor, easier on a phone)
+
+This repo includes `relay/wrangler.toml`, so Cloudflare can build the relay from it.
+
+1. In Cloudflare open **Workers & Pages → Create application**, then choose **Connect to Git** (sometimes labelled "Import a repository").
+2. Authorise GitHub when asked and pick the **Leer** repository.
+3. Set the project name to exactly `leer-relay`.
+4. Set the **Root directory** to `relay`. Leave the build command empty and keep the default deploy command (`npx wrangler deploy`).
+5. Press **Save and Deploy**, then copy the Worker's address (`https://leer-relay.yourname.workers.dev`) into Leer's Settings.
+
+If Cloudflare's pages are fiddly on a phone, tap the left icon in Safari's address bar and choose **Request Desktop Website**.
+
 ## Notes
 
 - Free plan allowance: 100,000 requests per day, far more than reading needs.
