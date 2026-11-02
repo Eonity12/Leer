@@ -129,10 +129,12 @@ const MDX={
   async search(s){const d=await mdget(`${MD}/manga?title=${encodeURIComponent(s)}&limit=30&includes[]=cover_art${RAT}&order[relevance]=desc`);return d.data.map(mdMini)},
   async chapters(m){
     let all=[],off=0,tot=1;
-    while(off<tot&&off<3000){const d=await mdget(`${MD}/manga/${m.id}/feed?translatedLanguage[]=en&order[chapter]=asc&limit=500&offset=${off}&includeExternalUrl=0${RAT}`);all=all.concat(d.data);tot=d.total;off+=500}
-    const seen=new Set();
-    return all.filter(c=>c.attributes.pages>0).filter(c=>{const k=c.attributes.chapter||c.id;if(seen.has(k))return false;seen.add(k);return true})
-      .map(c=>({id:c.id,n:c.attributes.chapter||'',v:c.attributes.volume||'',t:c.attributes.title||''}));
+    while(off<tot&&off<3000){const d=await mdget(`${MD}/manga/${m.id}/feed?translatedLanguage[]=en&order[chapter]=asc&limit=500&offset=${off}&includeExternalUrl=1${RAT}`);all=all.concat(d.data);tot=d.total;off+=500}
+    // Prefer chapters MangaDex hosts; keep publisher-hosted ones (external links) only where nothing hosted exists.
+    const byKey=new Map(), key=c=>c.attributes.chapter||c.id;
+    for(const c of all)if(c.attributes.pages>0&&!c.attributes.externalUrl&&!byKey.has(key(c)))byKey.set(key(c),c);
+    for(const c of all)if(c.attributes.externalUrl&&!byKey.has(key(c)))byKey.set(key(c),c);
+    return [...byKey.values()].map(c=>({id:c.id,n:c.attributes.chapter||'',v:c.attributes.volume||'',t:c.attributes.title||'',x:c.attributes.externalUrl||''}));
   },
   async pages(m,c){
     const d=await mdget(`${MD}/at-home/server/${c.id}`);
@@ -240,8 +242,9 @@ function drawDetail(){
   else{
     const order=curChs.map((_,i)=>i); if(desc)order.reverse();
     body=order.map(i=>{const c=curChs[i],p=P[c.id]||{};
-      return `<div class="ch${p.done?' read':''}" data-i="${i}"><div class="ct"><b>${c.v?'Vol '+esc(c.v)+' · ':''}Ch ${esc(c.n||'—')}</b>${c.t?`<span>${esc(c.t)}</span>`:''}</div><div class="ca">${p.done?'<i>✓ read</i>':(p.i?`<i>p.${p.i+1}</i>`:'')}</div></div>`}).join('');
+      return `<div class="ch${p.done?' read':''}" data-i="${i}"><div class="ct"><b>${c.v?'Vol '+esc(c.v)+' · ':''}Ch ${esc(c.n||'—')}</b>${c.t?`<span>${esc(c.t)}</span>`:''}</div><div class="ca">${c.x?'<i>Official site ↗</i>':(p.done?'<i>✓ read</i>':(p.i?`<i>p.${p.i+1}</i>`:''))}</div></div>`}).join('');
   }
+  if(curChs.length&&curChs.every(c=>c.x))body='<p class="pad mut sm">The chapters of this title are hosted on the publisher’s own site. Tapping one opens it there.</p>'+body;
   const nu=curChs.length?nextUp(m,curChs):-1;
   main.innerHTML=`<div class="top"><button id="bk">‹ Back</button></div>
   <div class="pad"><div class="fl"><img class="cv" referrerpolicy="${rp(m.c)}" src="${esc(px(m.c))}" alt=""><div class="meta"><h2>${esc(m.t)}</h2><p class="mut sm clamp">${esc((m.d||'').slice(0,500))}</p></div></div>
@@ -262,6 +265,7 @@ function imgErr(im){
   else im.classList.add('err');
 }
 async function openReader(m,chs,i,push){
+  if(chs[i].x){window.open(chs[i].x,'_blank','noopener');return}
   const c=chs[i], key=keyOf(m), tok={};
   rd={m,chs,i,c,pages:[],idx:0,tok,mode:cfg.mode==='vertical'?'v':'p',rtl:cfg.mode==='rtl'};
   const stale=()=>!rd||rd.tok!==tok;
