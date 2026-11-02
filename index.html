@@ -111,7 +111,7 @@ const flush=()=>{clearTimeout(sp);sv('prog',prog)};
 addEventListener('pagehide',flush);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)flush()});
 let tt; function toast(m){const e=$('#toast');e.textContent=m;e.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('on'),2600)}
-async function jget(u,o){const r=await fetch(u,o);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
+async function jget(u,o){const r=await fetch(u,o);if(!r.ok)throw new Error('HTTP '+r.status);const t=await r.text();try{return JSON.parse(t)}catch(e){throw new Error('reply was not JSON ('+t.slice(0,40).replace(/\s+/g,' ')+'…)')}}
 /* MangaDex only allows third-party apps through their own relay (see relay/RELAY.md) */
 const isMD=u=>/^https:\/\/([^/]*\.)?mangadex\.(org|network)(:\d+)?(\/|$)/.test(u);
 const px=u=>(cfg.proxy&&isMD(u))?cfg.proxy.replace(/\/+$/,'')+'/?url='+encodeURIComponent(u):u;
@@ -395,7 +395,7 @@ function viewSettings(){
   };
   $('#s-pxt').onclick=async()=>{
     if(!cfg.proxy)return toast('Save a relay URL first');
-    try{const r=await fetch(px('https://api.mangadex.org/ping')),t=await r.text();toast(r.ok&&/pong/i.test(t)?'Relay works ✓':'Relay replied HTTP '+r.status)}
+    try{const r=await fetch(px('https://api.mangadex.org/ping')),t=await r.text();toast(r.ok&&/pong/i.test(t)?'Relay works ✓':'Relay replied '+r.status+': '+t.slice(0,40).replace(/\s+/g,' '))}
     catch(e){toast('Relay unreachable: '+e.message)}
   };
   $('#s-add').onclick=()=>addList($('#s-url').value);

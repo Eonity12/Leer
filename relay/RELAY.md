@@ -15,12 +15,14 @@ This repo includes `relay/wrangler.toml`, so Cloudflare can build the relay from
 1. In Cloudflare open **Workers & Pages → Create application**, then choose **Connect to Git** (sometimes labelled "Import a repository").
 2. Authorise GitHub when asked and pick the **Leer** repository.
 3. Set the project name to exactly `leer-relay`.
-4. Set the **Root directory** to `relay`. Leave the build command empty and keep the default deploy command (`npx wrangler deploy`).
+4. Leave **Root directory** blank (the repo's top-level `wrangler.toml` already points at the relay). Leave the build command empty and keep the default deploy command (`npx wrangler deploy`).
 5. Press **Save and Deploy**, then copy the Worker's address (`https://leer-relay.yourname.workers.dev`) into Leer's Settings.
 
 If Cloudflare's pages are fiddly on a phone, tap the left icon in Safari's address bar and choose **Request Desktop Website**.
 
 ## Notes
+
+- Quick check that the right thing is deployed: open the Worker's address in Safari. The relay answers "Forbidden" to a plain visit, which is correct. If you see "Hello World", a web page, or anything else, Cloudflare has deployed the wrong thing.
 
 - Free plan allowance: 100,000 requests per day, far more than reading needs.
 - The Worker only answers requests coming from `https://eonity12.github.io` and only forwards to MangaDex hosts. If you host Leer somewhere else, edit `ALLOWED_ORIGINS` at the top of `worker.js`. This is a soft lock: it stops casual misuse, not someone determined to spoof headers.
