@@ -100,7 +100,7 @@ const sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true}catch
 
 /* ---------- state ---------- */
 let lib=ld('lib',{}), prog=ld('prog',{});
-let cfg=Object.assign({mode:'vertical',saver:true,lists:[]},ld('cfg',{}));
+let cfg=Object.assign({mode:'vertical',saver:true,lists:[],proxy:''},ld('cfg',{}));
 let tab='browse', sel='md', q='', browseRes=null, browseKey='';
 let cur=null, curChs=[], curState='loading', curErr='', desc=true;
 let inDetail=false, inReader=false, rd=null, scrollSave=0, lastTop=0, barT=0;
@@ -112,6 +112,11 @@ addEventListener('pagehide',flush);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)flush()});
 let tt; function toast(m){const e=$('#toast');e.textContent=m;e.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('on'),2600)}
 async function jget(u,o){const r=await fetch(u,o);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
+/* MangaDex only allows third-party apps through their own relay (see relay/RELAY.md) */
+const isMD=u=>/^https:\/\/([^/]*\.)?mangadex\.(org|network)(:\d+)?(\/|$)/.test(u);
+const px=u=>(cfg.proxy&&isMD(u))?cfg.proxy.replace(/\/+$/,'')+'/?url='+encodeURIComponent(u):u;
+const rp=u=>px(u)!==u?'origin':'no-referrer';
+const mdget=u=>{if(!cfg.proxy)throw new Error('MangaDex needs the relay. Add its URL in Settings.');return jget(px(u))};
 
 /* ---------- sources ---------- */
 const MD='https://api.mangadex.org';
@@ -120,17 +125,17 @@ const mdCover=m=>{const r=m.relationships.find(x=>x.type==='cover_art');const f=
 const mdTitle=m=>m.attributes.title.en||Object.values(m.attributes.title)[0]||'Untitled';
 const mdMini=m=>({src:'md',id:m.id,t:mdTitle(m),c:mdCover(m),d:(m.attributes.description&&m.attributes.description.en)||''});
 const MDX={
-  async popular(){const d=await jget(`${MD}/manga?limit=30&includes[]=cover_art${RAT}&order[followedCount]=desc&hasAvailableChapters=true&availableTranslatedLanguage[]=en`);return d.data.map(mdMini)},
-  async search(s){const d=await jget(`${MD}/manga?title=${encodeURIComponent(s)}&limit=30&includes[]=cover_art${RAT}&order[relevance]=desc`);return d.data.map(mdMini)},
+  async popular(){const d=await mdget(`${MD}/manga?limit=30&includes[]=cover_art${RAT}&order[followedCount]=desc&hasAvailableChapters=true&availableTranslatedLanguage[]=en`);return d.data.map(mdMini)},
+  async search(s){const d=await mdget(`${MD}/manga?title=${encodeURIComponent(s)}&limit=30&includes[]=cover_art${RAT}&order[relevance]=desc`);return d.data.map(mdMini)},
   async chapters(m){
     let all=[],off=0,tot=1;
-    while(off<tot&&off<3000){const d=await jget(`${MD}/manga/${m.id}/feed?translatedLanguage[]=en&order[chapter]=asc&limit=500&offset=${off}&includeExternalUrl=0${RAT}`);all=all.concat(d.data);tot=d.total;off+=500}
+    while(off<tot&&off<3000){const d=await mdget(`${MD}/manga/${m.id}/feed?translatedLanguage[]=en&order[chapter]=asc&limit=500&offset=${off}&includeExternalUrl=0${RAT}`);all=all.concat(d.data);tot=d.total;off+=500}
     const seen=new Set();
     return all.filter(c=>c.attributes.pages>0).filter(c=>{const k=c.attributes.chapter||c.id;if(seen.has(k))return false;seen.add(k);return true})
       .map(c=>({id:c.id,n:c.attributes.chapter||'',v:c.attributes.volume||'',t:c.attributes.title||''}));
   },
   async pages(m,c){
-    const d=await jget(`${MD}/at-home/server/${c.id}`);
+    const d=await mdget(`${MD}/at-home/server/${c.id}`);
     const dir=cfg.saver?'data-saver':'data', arr=cfg.saver?d.chapter.dataSaver:d.chapter.data;
     return arr.map(f=>`${d.baseUrl}/${dir}/${d.chapter.hash}/${f}`);
   }
@@ -177,7 +182,7 @@ function render(){
 }
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render();main.scrollTop=0});
 
-const grid=l=>l.length?`<div class="grid">${l.map((m,i)=>`<div class="c" data-i="${i}"><img loading="lazy" referrerpolicy="no-referrer" src="${esc(m.c)}" alt=""><div>${esc(m.t)}</div></div>`).join('')}</div>`:'<p class="pad mut">Nothing found.</p>';
+const grid=l=>l.length?`<div class="grid">${l.map((m,i)=>`<div class="c" data-i="${i}"><img loading="lazy" referrerpolicy="${rp(m.c)}" src="${esc(px(m.c))}" alt=""><div>${esc(m.t)}</div></div>`).join('')}</div>`:'<p class="pad mut">Nothing found.</p>';
 const bindGrid=l=>main.querySelectorAll('.c').forEach(e=>e.onclick=()=>openDetail(l[+e.dataset.i]));
 
 async function viewBrowse(){
@@ -239,7 +244,7 @@ function drawDetail(){
   }
   const nu=curChs.length?nextUp(m,curChs):-1;
   main.innerHTML=`<div class="top"><button id="bk">‹ Back</button></div>
-  <div class="pad"><div class="fl"><img class="cv" referrerpolicy="no-referrer" src="${esc(m.c)}" alt=""><div class="meta"><h2>${esc(m.t)}</h2><p class="mut sm clamp">${esc((m.d||'').slice(0,500))}</p></div></div>
+  <div class="pad"><div class="fl"><img class="cv" referrerpolicy="${rp(m.c)}" src="${esc(px(m.c))}" alt=""><div class="meta"><h2>${esc(m.t)}</h2><p class="mut sm clamp">${esc((m.d||'').slice(0,500))}</p></div></div>
   <div class="row" style="margin-top:12px"><button class="p" id="go" ${nu<0?'disabled':''}>${P._last&&nu>=0?'Continue · Ch '+esc(curChs[nu].n||'—'):'Start reading'}</button><button id="sv">${inL?'In library ✓':'+ Library'}</button><button id="so">${desc?'Newest ↓':'Oldest ↑'}</button></div></div>${body}`;
   main.scrollTop=st;
   $('#bk').onclick=()=>history.back();
@@ -279,7 +284,7 @@ async function openReader(m,chs,i,push){
   rd.pages=pages;
   const start=p.done?0:Math.min(p.i||0,pages.length-1);
   if(rd.mode==='v'){
-    body.innerHTML=pages.map((u,j)=>`<img class="pi" referrerpolicy="no-referrer" ${j>start+1?'loading="lazy"':''} onload="this.classList.add('ld')" onerror="imgErr(this)" src="${esc(u)}" alt="">`).join('')
+    body.innerHTML=pages.map((u,j)=>`<img class="pi" referrerpolicy="${rp(u)}" ${j>start+1?'loading="lazy"':''} onload="this.classList.add('ld')" onerror="imgErr(this)" src="${esc(px(u))}" alt="">`).join('')
       +`<div class="end"><button class="p" id="nx">${i+1<chs.length?'Next chapter ›':'Back to series'}</button></div>`;
     R.scrollTop=(start&&body.children[start])?body.children[start].offsetTop:0; lastTop=R.scrollTop;
   }else{
@@ -289,9 +294,9 @@ async function openReader(m,chs,i,push){
 }
 function showP(j){
   rd.idx=j; const img=$('#pimg');
-  img.classList.remove('ld'); img.removeAttribute('data-r'); img.classList.remove('err'); img.src=rd.pages[j];
+  img.classList.remove('ld'); img.removeAttribute('data-r'); img.classList.remove('err'); img.referrerPolicy=rp(rd.pages[j]); img.src=px(rd.pages[j]);
   $('#rpg').textContent=`${j+1} / ${rd.pages.length}`;
-  [1,2].forEach(k=>{if(rd.pages[j+k]){const im=new Image();im.referrerPolicy='no-referrer';im.src=rd.pages[j+k]}});
+  [1,2].forEach(k=>{if(rd.pages[j+k]){const u=rd.pages[j+k],im=new Image();im.referrerPolicy=rp(u);im.src=px(u)}});
   const key=keyOf(rd.m), p=prog[key][rd.c.id]; p.i=j; p.n=rd.pages.length; if(j>=rd.pages.length-1)p.done=1; saveProg();
 }
 function step(d){
@@ -361,6 +366,10 @@ function viewSettings(){
   <h3>Reading</h3>
   <select id="s-mode"><option value="vertical">Vertical scroll (webtoon)</option><option value="rtl">Paged · right-to-left (manga)</option><option value="ltr">Paged · left-to-right</option></select>
   <label class="row"><input type="checkbox" id="s-saver"> Data-saver images (MangaDex)</label>
+  <h3>MangaDex relay</h3>
+  <p class="mut sm">MangaDex only works through a relay you host (free). See relay/RELAY.md in the repo. Paste its address here.</p>
+  <div class="row"><input id="s-px" placeholder="https://leer-relay.yourname.workers.dev" value="${esc(cfg.proxy||'')}" autocapitalize="none" autocorrect="off"><button class="p" id="s-pxs">Save</button></div>
+  <div class="row"><button id="s-pxt">Test connection</button></div>
   <h3>Source lists</h3>
   <p class="mut sm">Paste a GitHub link to a JSON list, or <b>user/repo</b> to load that repo's sources.json.</p>
   <div class="row"><input id="s-url" placeholder="user/repo or JSON URL" autocapitalize="none" autocorrect="off"><button class="p" id="s-add">Add</button></div>
@@ -375,6 +384,12 @@ function viewSettings(){
   $('#s-mode').value=cfg.mode; $('#s-saver').checked=!!cfg.saver;
   $('#s-mode').onchange=e=>{cfg.mode=e.target.value;sv('cfg',cfg)};
   $('#s-saver').onchange=e=>{cfg.saver=e.target.checked;sv('cfg',cfg)};
+  $('#s-pxs').onclick=()=>{cfg.proxy=$('#s-px').value.trim().replace(/\/+$/,'');sv('cfg',cfg);browseKey='';toast(cfg.proxy?'Relay saved':'Relay cleared')};
+  $('#s-pxt').onclick=async()=>{
+    if(!cfg.proxy)return toast('Save a relay URL first');
+    try{const r=await fetch(px('https://api.mangadex.org/ping')),t=await r.text();toast(r.ok&&/pong/i.test(t)?'Relay works ✓':'Relay replied HTTP '+r.status)}
+    catch(e){toast('Relay unreachable: '+e.message)}
+  };
   $('#s-add').onclick=()=>addList($('#s-url').value);
   $('#s-url').addEventListener('keydown',e=>{if(e.key==='Enter')addList(e.target.value)});
   main.querySelectorAll('.rm').forEach(b=>b.onclick=()=>{const l=cfg.lists.splice(+b.dataset.i,1)[0];if(sel==='l:'+l.url){sel='md';browseKey=''}sv('cfg',cfg);viewSettings()});
